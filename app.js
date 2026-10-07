@@ -8,8 +8,9 @@ const CONFIG = {
   API_BASE: 'https://carapi.app/api',
   PAGE_LIMIT: 100,      // rows per API page
   MAX_PAGES: 15,        // safety cap per endpoint (15 x 100 rows)
+  RETRIES: 3,           // retries per request on network error, 429 or 5xx
   BATCH: 24,            // cards rendered per "show more"
-  CHUNK: 50,            // trim ids resolved per request
+  CHUNK: 25,            // trim ids resolved per request
   SITE_URL: 'https://spec-hunter.suvadipchakraborty.workers.dev/',
 };
 
@@ -116,7 +117,10 @@ async function getJwt(force = false) {
   return jwtPending;
 }
 
-async function api(endpoint, filters, extra = {}, page = 1, retried = false) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** One CarAPI GET with retries: network drops, 429 and 5xx are retried with backoff; 401 re-logs in once. */
+async function api(endpoint, filters, extra = {}, page = 1, retried = false, attempt = 0) {
   const url = new URL(`${CONFIG.API_BASE}/${endpoint}`);
   url.searchParams.set('limit', CONFIG.PAGE_LIMIT);
   url.searchParams.set('page', page);
@@ -124,11 +128,26 @@ async function api(endpoint, filters, extra = {}, page = 1, retried = false) {
   Object.entries(extra).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const jwt = await getJwt(retried);
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${jwt}` },
-  });
-  if (res.status === 401 && !retried && !hasJwtOverride()) return api(endpoint, filters, extra, page, true);
+  let res;
+  try {
+    res = await fetch(url, { headers: { Accept: 'application/json', Authorization: `Bearer ${jwt}` } });
+  } catch (err) {
+    // "Failed to fetch": offline, blocked, or a throttled response without CORS headers
+    if (attempt < CONFIG.RETRIES) {
+      await sleep(800 * 2 ** attempt);
+      return api(endpoint, filters, extra, page, retried, attempt + 1);
+    }
+    throw new Error(navigator.onLine === false
+      ? 'You appear to be offline. Check your connection and hunt again.'
+      : 'Could not reach CarAPI (it may be rate limiting). Wait a minute and hunt again.');
+  }
+  if (res.status === 401 && !retried && !hasJwtOverride()) return api(endpoint, filters, extra, page, true, attempt);
   if (res.status === 401 || res.status === 403) throw new Error('CarAPI rejected the credentials, or your plan does not cover this request.');
+  if ((res.status === 429 || res.status >= 500) && attempt < CONFIG.RETRIES) {
+    const wait = Number(res.headers.get('Retry-After')) * 1000 || 1000 * 2 ** attempt;
+    await sleep(Math.min(wait, 8000));
+    return api(endpoint, filters, extra, page, retried, attempt + 1);
+  }
   if (res.status === 429) throw new Error('CarAPI rate limit reached. Wait a minute and hunt again.');
   if (!res.ok) throw new Error(`CarAPI returned ${res.status}. Try narrowing your filters.`);
   return res.json();
@@ -230,10 +249,10 @@ async function loadMore(run = state.run) {
         { field: 'year', op: '<=', val: f.yearMax },
       ];
       const needWeights = chunk.filter((id) => !state.weights.has(id));
-      const [trims, bodies] = await Promise.all([
-        api('trims', tf, { verbose: 'yes' }),
-        needWeights.length ? api('bodies', [{ field: 'make_model_trim_id', op: 'in', val: needWeights }]) : { data: [] },
-      ]);
+      const trims = await api('trims', tf, { verbose: 'yes' });
+      const bodies = needWeights.length
+        ? await api('bodies', [{ field: 'make_model_trim_id', op: 'in', val: needWeights }])
+        : { data: [] };
       if (run !== state.run) return;
       (bodies.data || []).forEach((r) => r.curb_weight && state.weights.set(r.make_model_trim_id, r.curb_weight));
 
@@ -248,6 +267,7 @@ async function loadMore(run = state.run) {
   } catch (err) {
     if (run === state.run) setStatus(err.message, true);
     ui.more.disabled = false;
+    ui.more.hidden = state.cursor >= state.matches.length && !ui.grid.children.length;
     return;
   }
   ui.more.disabled = false;

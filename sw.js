@@ -1,4 +1,4 @@
-const CACHE = 'spechunter-v1';
+const CACHE = 'spechunter-v2';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.json'];
 
 self.addEventListener('install', (e) => {
