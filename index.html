@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SpecHunter | Find cars by specs, not badges</title>
+  <meta name="description" content="Reverse-engineer your next car purchase. Search by power, weight, and layout, not by the badge.">
+  <meta name="theme-color" content="#1A1A1A">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%231A1A1A'/%3E%3Cpath d='M96 352a160 160 0 1 1 320 0' fill='none' stroke='%23FF5A1F' stroke-width='36' stroke-linecap='round'/%3E%3Cpath d='M256 352l80-120' stroke='%2319E3F0' stroke-width='28' stroke-linecap='round'/%3E%3Ccircle cx='256' cy='352' r='28' fill='%23FF5A1F'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="https://spec-hunter.suvadipchakraborty.workers.dev/preview.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SpecHunter">
+  <meta property="og:title" content="SpecHunter | Find cars by specs, not badges">
+  <meta property="og:description" content="Search by power, weight, and layout. Get the exact trims that match your track-car checklist.">
+  <meta property="og:url" content="https://spec-hunter.suvadipchakraborty.workers.dev/">
+  <meta property="og:image" content="https://spec-hunter.suvadipchakraborty.workers.dev/preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SpecHunter | Find cars by specs, not badges">
+  <meta name="twitter:description" content="Search by power, weight, and layout. Get the exact trims that match your track-car checklist.">
+  <meta name="twitter:image" content="https://spec-hunter.suvadipchakraborty.workers.dev/preview.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M5 22a11 11 0 1 1 22 0" fill="none" stroke="#FF5A1F" stroke-width="3" stroke-linecap="round"/><path d="M16 22l6-8" stroke="#19E3F0" stroke-width="2.6" stroke-linecap="round"/><circle cx="16" cy="22" r="2.6" fill="#FF5A1F"/></svg>
+      <span class="brand-name">SpecHunter</span>
+    </div>
+    <p class="tagline">Search by power, weight, and layout.</p>
+  </header>
+
+  <main>
+    <!-- THE HUNT -->
+    <section id="tab-hunt" class="tab active" aria-labelledby="nav-hunt">
+      <div class="hunt">
+        <aside id="filters" class="panel filters" aria-label="Mechanical filters">
+          <div class="sheet-handle" aria-hidden="true"></div>
+          <h2>Spec sheet</h2>
+          <form id="filter-form" autocomplete="off">
+            <fieldset>
+              <legend>Model years <output id="yearOut">1990 to 2024</output></legend>
+              <div class="dual">
+                <input type="range" id="yearMin" min="1990" max="2024" value="1990" step="1" aria-label="Earliest year">
+                <input type="range" id="yearMax" min="1990" max="2024" value="2024" step="1" aria-label="Latest year">
+              </div>
+            </fieldset>
+
+            <label class="field">Drive type
+              <select id="drive">
+                <option value="any">Any</option>
+                <option value="RWD">RWD</option>
+                <option value="AWD">AWD</option>
+                <option value="FWD">FWD</option>
+              </select>
+            </label>
+
+            <label class="field">Minimum horsepower <output id="hpOut">Any</output>
+              <input type="range" id="hp" min="0" max="800" step="10" value="0">
+            </label>
+
+            <label class="field">Maximum curb weight <output id="wtOut">No limit</output>
+              <input type="range" id="weight" min="1500" max="6000" step="50" value="6000">
+            </label>
+
+            <label class="field">Engine cylinders
+              <select id="cyl">
+                <option value="any">Any</option>
+                <option>4</option><option>6</option><option>8</option><option>10</option><option>12</option>
+              </select>
+            </label>
+
+            <div class="actions">
+              <button type="submit" class="btn primary" id="huntBtn">Find matching trims</button>
+              <button type="button" class="btn ghost" id="resetBtn">Reset</button>
+            </div>
+          </form>
+        </aside>
+
+        <section class="results" aria-live="polite">
+          <div class="results-head">
+            <div>
+              <h2>Matching trims</h2>
+              <p id="status" class="status">Set your specs, then hunt.</p>
+            </div>
+            <button type="button" class="btn ghost filter-toggle" id="filterToggle" aria-expanded="false" aria-controls="filters">Filters</button>
+          </div>
+          <div id="grid" class="grid"></div>
+          <button type="button" class="btn ghost more" id="moreBtn" hidden>Show more trims</button>
+        </section>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section id="tab-about" class="tab" aria-labelledby="nav-about">
+      <article class="about panel">
+        <h1>SpecHunter</h1>
+        <p class="lede">Reverse-engineer your next car purchase. Search by power, weight, and layout—not by the badge.</p>
+
+        <h2>Features</h2>
+        <ul>
+          <li>Deep mechanical filtering by drive type, horsepower, and cylinder count</li>
+          <li>Cross-referencing horsepower and curb weight in one search</li>
+          <li>Exact trim identification, so you know which version to look for</li>
+        </ul>
+
+        <h2>Benefits</h2>
+        <p>Helps driving enthusiasts and track-day builders find hidden gems and exact spec configurations on the used car market.</p>
+
+        <h2>Credits</h2>
+        <p>Powered by the CarAPI database. Photos come from Wikipedia when a matching article exists.</p>
+
+        <div class="install">
+          <button type="button" class="btn primary" id="installBtn">Install app</button>
+          <p id="installHint" class="hint"></p>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <nav class="bottom-nav" aria-label="Main">
+    <button type="button" id="nav-hunt" class="active" data-tab="hunt" aria-current="page"><span aria-hidden="true">🔎</span>The Hunt</button>
+    <button type="button" id="nav-about" data-tab="about"><span aria-hidden="true">ℹ️</span>About</button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
